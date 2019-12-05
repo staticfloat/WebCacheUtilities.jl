@@ -18,7 +18,7 @@ function get_prefixes_by_region()
                 continue
             end
             region = r["name"][12:end]
-            prefixes_by_region[region] = IPSubnet.(r["properties"]["addressPrefixes"])
+            prefixes_by_region[region] = unique(IPSubnet.(r["properties"]["addressPrefixes"]))
         end
     end
     return prefixes_by_region

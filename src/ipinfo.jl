@@ -17,5 +17,5 @@ function extract_subnets_from_ipinfo(as_number::AbstractString)
             end
         end
     end
-    return subnets
+    return unique(subnets)
 end

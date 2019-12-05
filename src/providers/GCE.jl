@@ -47,7 +47,7 @@ function prefixes()
             end
         end
     end
-    return ranges
+    return unique(ranges)
 end
 
 end # module GCE

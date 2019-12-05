@@ -14,6 +14,10 @@ function get_prefixes_by_region()
             end
             push!(prefixes_by_region[p["region"]], IPSubnet(p["ip_prefix"]))
         end
+
+        for region in keys(prefixes_by_region)
+            prefixes_by_region[region] = unique(prefixes_by_region[region])
+        end
     end
     return prefixes_by_region
 end
