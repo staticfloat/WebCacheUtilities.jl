@@ -1,20 +1,29 @@
 module WebCacheUtilities
 using JSON, HTTP, Sockets
 
-export prefixes_by_provider
-
 include("file_cache.jl")
 include("IPSubnet.jl")
 include("ipinfo.jl")
+
+# Cloud providers
 include("providers/GCE.jl")
 include("providers/AWS.jl")
 include("providers/Azure.jl")
 include("providers/Packet.jl")
 include("providers/MacStadium.jl")
 include("providers/LiquidWeb.jl")
+
+# CI providers
+include("providers/Travis.jl")
+include("providers/Appveyor.jl")
+include("providers/Cirrus.jl")
+include("providers/Drone.jl")
+
 include("CSVAnalysis.jl")
 include("graylog.jl")
 include("Fastly.jl")
+
+export prefixes_by_provider, ci_prefixes_by_provider
 
 function prefixes_by_provider(;aws_regions=["us-east-1", "us-east-2", "us-west-1", "us-west-2"],
                                azure_regions=["westus", "westus2", "eastus", "eastus2", "centralus", "northcentralus", "southcentralus"])
@@ -33,6 +42,17 @@ function prefixes_by_provider(;aws_regions=["us-east-1", "us-east-2", "us-west-1
     end
 
     return prefixes
+end
+
+function ci_prefixes_by_provider()
+    ci_prefixes = Dict{String,Vector{<:IPSubnet}}(
+        "Travis" => Travis.prefixes(),
+        "Cirrus" => Cirrus.prefixes(),
+        "Appveyor" => Appveyor.prefixes(),
+        # Eventually
+        #"Drone" => Drone.prefixes(),
+    )
+    return ci_prefixes
 end
 
 end # module

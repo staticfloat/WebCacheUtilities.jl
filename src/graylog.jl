@@ -3,7 +3,10 @@ using HTTP, Dates, JSON
 export download_graylog_csv
 
 # If csv_path is not given; default to using the file cache
-download_graylog_csv(;kwargs...) = hit_file_cache(csv_path -> download_graylog_csv(csv_path; kwargs...), "graylog.csv")
+function download_graylog_csv(; time_period::TimePeriod=Hour(48), kwargs...)
+    seconds = Second(time_period).value
+    return hit_file_cache(csv_path -> download_graylog_csv(csv_path; kwargs...), "graylog_$(seconds).csv")
+end
 
 graylog_session_token = Ref("")
 function get_graylog_token(username=nothing, password=nothing; server="graylog.e.ip.saba.us")
@@ -37,7 +40,7 @@ end
 function download_graylog_csv(csv_path::AbstractString;
                               auth = get_graylog_token(),
                               time_period::TimePeriod=Hour(48),
-                              fields::Tuple = ("http_payload_size", "http_src", "http_uri",),
+                              fields::Tuple = ("http_payload_size", "http_src", "http_uri", "http_method", "http_response_code"),
                               server = "graylog.e.ip.saba.us",
                               api_endpoint = "api/search/universal/relative/export")
     params = (

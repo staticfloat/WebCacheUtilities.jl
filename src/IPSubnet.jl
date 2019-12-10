@@ -1,6 +1,6 @@
 export IPSubnet, @subnet_str
 
-import Base: show, in
+import Base: show, in, length, iterate, string, print
 
 # We should have something like this within Sockets maybe?
 """
@@ -64,9 +64,8 @@ macro subnet_str(address_and_mask)
     IPSubnet(address_and_mask)
 end
 
-function show(io::IO, x::IPSubnet)
-    print(io, "subnet\"$(x.address)/$(x.mask)\"")
-end
+show(io::IO, x::IPSubnet) = print(io, "subnet\"", x.address, "/", x.mask, "\"")
+print(io::IO, x::IPSubnet) = print(io, string(x.address, "/", x.mask))
 
 # Define set operations for `IPAddr`s and `IPSubnet`s
 function in(addr::I, subnet::IPSubnet{I}) where {I <: IPAddr}
@@ -76,3 +75,13 @@ end
 # Fast-path nonmatching address-to-subnet operations as `false`
 in(addr::IPv4, subnet::IPSubnet{<:IPv6}) = false
 in(addr::IPv6, subnet::IPSubnet{<:IPv4}) = false
+
+# Iteration over subnets yields IP addresses
+length(subnet::IPSubnet{IPv4}) = 2^(32 - subnet.mask)
+length(subnet::IPSubnet{IPv6}) = 2^(128 - subnet.mask)
+function iterate(subnet::IPSubnet{I}, state=0) where {I <: IPAddr}
+    if state >= length(subnet)
+        return nothing
+    end
+    return (I(subnet.address.host + state), state+1)
+end

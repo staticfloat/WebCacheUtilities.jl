@@ -1,47 +1,53 @@
-import DelimitedFiles
+using CSV, DataFrames
 
-export parse_csv_source_ips, parse_csv_traffic_per_ip, attribute_ips_to_providers, attribute_traffic_to_providers
+export parse_csv_source_ips, parse_csv_payload_sizes, parse_csv_http_uri, parse_csv_http_method, parse_csv_http_response_code,
+       attribute_ips_to_providers, attribute_traffic_to_providers, find_provider
 
-function parse_csv_source_ips(path::AbstractString)
-    csv_data = DelimitedFiles.readdlm(path, ',')
-
-    http_srcs_idx = findfirst(csv_data[1, :] .== "http_src")
-    if http_srcs_idx === nothing
-        error("Unable to find the `http_srcs` column, make sure you exported it!")
+function checkprop(df, name)
+    if !hasproperty(df, name)
+        error("Unable to find the `$(name)` column, make sure you exported it from graylog!")
     end
+end
+
+# Generate String -> DataFrame converters
+for f in (:parse_csv_source_iups, :parse_csv_payload_sizes, :parse_csv_http_uri, :parse_csv_http_method, :parse_csv_http_response_code)
+    @eval $(f)(path::AbstractString) = $(f)(CSV.read(path))
+end
+
+function parse_csv_source_ips(csv_data::DataFrame)
+    checkprop(csv_data, :http_src)
 
     # Grab all the `http_src` fields, parse them out into IPAddr's and return them
-    return parse.(IPAddr, csv_data[2:end, http_srcs_idx])
+    return parse.(IPAddr, csv_data[:, :http_src])
 end
 
-function parse_csv_traffic_per_ip(path::AbstractString)
-    csv_data = DelimitedFiles.readdlm(path, ',')
+function parse_csv_payload_sizes(csv_data::DataFrame)
+    checkprop(csv_data, :http_payload_size)
 
-    http_srcs_idx = findfirst(csv_data[1, :] .== "http_src")
-    if http_srcs_idx === nothing
-        error("Unable to find the `http_srcs` column, make sure you exported it!")
-    end
-    http_payload_size_idx = findfirst(csv_data[1, :] .== "http_payload_size")
-    if http_payload_size_idx === nothing
-        error("Unable to find the `http_payload_size` column, make sure you exported it!")
-    end
-
-    # Grab IPs and payload sizes
-    ips = parse.(IPAddr, csv_data[2:end, http_srcs_idx])
-    parse_payload(x::AbstractString) = 0
+    parse_payload(x::Missing) = 0
     parse_payload(x::Integer) = Int64(x)
-    payloads = parse_payload.(csv_data[2:end, http_payload_size_idx])
-    
-    # Uniquify them, turn into a dictionary
-    ip_traffic = Dict(ip => 0 for ip in ips)
-
-    # Start summing it up!
-    for idx in 1:length(payloads)
-        ip_traffic[ips[idx]] += payloads[idx]
-    end
-    
-    return ip_traffic
+    return parse_payload.(csv_data[:, :http_payload_size])
 end
+
+function parse_csv_http_uri(csv_data::DataFrame)
+    checkprop(csv_data, :http_uri)
+    
+    return csv_data[:, :http_uri]
+end
+
+function parse_csv_http_response_code(csv_data::DataFrame)
+    checkprop(csv_data, :http_response_code)
+    
+    return csv_data[:, :http_response_code]
+end
+
+function parse_csv_http_method(csv_data::DataFrame)
+    checkprop(csv_data, :http_method)
+
+    return csv_data[:, :http_method]
+end
+
+
 
 firstbyte(x::UInt32)  = UInt8(x >> 24)
 firstbyte(x::UInt128) = UInt8(x >> 120)

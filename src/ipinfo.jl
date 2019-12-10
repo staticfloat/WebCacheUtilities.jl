@@ -19,3 +19,33 @@ function extract_subnets_from_ipinfo(as_number::AbstractString)
     end
     return unique(subnets)
 end
+
+
+function dig(addr, record_type="A")
+    # Until we have a builtin resolver in Julia, we'll shell out to `dig`:
+    raw = chomp(String(read(`dig +noall +answer $addr $record_type`)))
+
+    # Parse out the 5th column stuff
+    result = String[]
+    for line in split(raw, "\n")
+        line = split(line)
+        if length(line) < 5
+            continue
+        end
+        push!(result, join(line[5:end], " "))
+    end
+    return result
+end
+
+function dig_cache(domain, record_type="A")
+    record_file = hit_file_cache("$(domain)_$(record_type).txt") do record_file
+        # Write the DNS queries out to a .txt file, one line per record
+        open(record_file, "w") do io
+            records = dig(domain, record_type)
+            for record in records
+                println(io, record)
+            end
+        end
+    end
+    return readlines(record_file)
+end
