@@ -55,4 +55,10 @@ function ci_prefixes_by_provider()
     return ci_prefixes
 end
 
+
+function __init__()
+    # Set up HTTP to use a default user-agent
+    HTTP.setuseragent!("WebCacheUtilities.jl")
+end
+
 end # module
