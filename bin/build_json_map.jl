@@ -84,11 +84,11 @@ out_path = joinpath(@__DIR__, "..", "data", "versions.json")
 for version in tag_versions
     for platform in julia_platforms
         url = download_url(version, platform)
+        filename = basename(url)
 
         # Download this URL to a local file
         local filepath
         try
-            filename = basename(url)
             @info("Downloading $(filename)...")
             filepath = WebCacheUtilities.download_to_cache(filename, url)
         catch e
@@ -97,9 +97,15 @@ for version in tag_versions
             end
             continue
         end
-        tarball_hash = open(filepath, "r") do io
-            bytes2hex(sha256(io))
+
+        tarball_hash_path = hit_file_cache("$(filename).sha256") do tarball_hash_path
+            open(filepath, "r") do io
+                open(tarball_hash_path, "w") do hash_io
+                    write(hash_io, bytes2hex(sha256(io)))
+                end
+            end
         end
+        tarball_hash = String(read(tarball_hash_path))
 
         # Initialize overall version key, if needed
         if !haskey(meta, version)
@@ -111,14 +117,16 @@ for version in tag_versions
 
         # Test to see if there is an asc signature:
         asc_signature = nothing
-        try
-            asc_url = string(url, ".asc")
-            @info("Downloading $(basename(asc_url))")
-            asc_filepath = WebCacheUtilities.download_to_cache(basename(asc_url), asc_url)
-            asc_signature = String(read(asc_filepath))
-        catch e
-            if isa(e, InterruptException)
-                rethrow(e)
+        if !isa(platform, MacOS) && !isa(platform, Windows)
+            try
+                asc_url = string(url, ".asc")
+                @info("Downloading $(basename(asc_url))")
+                asc_filepath = WebCacheUtilities.download_to_cache(basename(asc_url), asc_url)
+                asc_signature = String(read(asc_filepath))
+            catch e
+                if isa(e, InterruptException)
+                    rethrow(e)
+                end
             end
         end
 
@@ -131,6 +139,7 @@ for version in tag_versions
             "sha256" => tarball_hash,
             "size" => filesize(filepath),
             "kind" => "archive",
+            "url" => url,
         )
         # Add in `.asc` signature content, if applicable
         if asc_signature !== nothing
