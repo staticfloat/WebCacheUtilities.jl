@@ -130,25 +130,29 @@ for version in tag_versions
             end
         end
 
-        # Build up metadata about this archive
-        archive_dict = Dict(
+        # Build up metadata about this file
+        kind = "archive"
+        if endswith(filename, ".exe")
+            kind = "installer"
+        end
+        file_dict = Dict(
             "triplet" => triplet(platform),
             "os" => up_os(platform),
             "arch" => string(arch(platform)),
             "version" => string(version),
             "sha256" => tarball_hash,
             "size" => filesize(filepath),
-            "kind" => "archive",
+            "kind" => kind,
             "url" => url,
         )
         # Add in `.asc` signature content, if applicable
         if asc_signature !== nothing
-            archive_dict["asc"] = asc_signature
+            file_dict["asc"] = asc_signature
         end
 
         # Right now, all we have are archives, but let's be forward-thinking
         # and make this an array of dictionaries that is easy to extensibly match
-        push!(meta[version]["files"], archive_dict)
+        push!(meta[version]["files"], file_dict)
 
         # Write out new versions of our versions.json as we go
         open(out_path, "w") do io
