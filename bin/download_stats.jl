@@ -273,3 +273,19 @@ begin
         left_margin=14mm,
     )
 end
+
+
+begin
+    groupedbar(
+        1:length(months),
+        hcat((collect(split_by_os[m][os] for m in months) for os in oses)...),
+        label=hcat(oses...),
+        ylabel="Hits by OS",
+        bar_position=:stack,
+        legend=:bottomleft,
+        xticks=(1:length(months), ["$(monthname(m)) $(year(m))" for m in months]),
+        xrotation=30,
+        bottom_margin=11mm,
+        left_margin=17mm,
+    )
+end
