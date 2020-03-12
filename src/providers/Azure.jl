@@ -1,16 +1,27 @@
 module Azure
-using HTTP, JSON
-import ..IPSubnet, ..download_to_cache
+using HTTP, JSON, Gumbo, AbstractTrees
+import ..IPSubnet, ..download_to_cache, ..for_each_href
 
 prefixes_by_region = Dict{String,Vector{IPSubnet}}()
 function get_prefixes_by_region()
     global prefixes_by_region
     if isempty(prefixes_by_region)
-        json_file = download_to_cache(
-            "azure_ip_ranges.json",
-            "https://download.microsoft.com/download/7/1/D/71D86715-5596-4529-9B13-DA13A5DE5B63/ServiceTags_Public_20191202.json"
+        html_path = download_to_cache(
+            "azure_html_bounce.html",
+            "https://www.microsoft.com/en-us/download/confirmation.aspx?id=56519",
         )
         
+        json_url = nothing
+        for_each_href(html_path) do href
+            if match(r"ServiceTags_Public_\d+\.json$", href) !== nothing
+                json_url = href
+            end
+        end
+
+        if json_url === nothing
+            error("Unable to auto-detect Azure IP ranges JSON location.  PHOOEY.")
+        end
+        json_file = download_to_cache("azure_ip_ranges.json", json_url)
         regions = JSON.parsefile(json_file)["values"]
         for r in regions
             # We only care about the `AzureCloud.<name>` values

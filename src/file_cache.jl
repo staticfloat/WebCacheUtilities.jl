@@ -26,5 +26,5 @@ function hit_file_cache(creator::Function, filename::String, lifetime::TimePerio
             rethrow(e)
         end
     end
-    return file_cache_path
+    return abspath(file_cache_path)
 end

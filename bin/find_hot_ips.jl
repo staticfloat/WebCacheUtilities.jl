@@ -11,7 +11,7 @@ ci_pxs = ci_prefixes_by_provider()
 
 # We're going to try and find "hot" IPs by downloading the last two months of requests,
 # then showing the top IPs that did a lot of GET requests to things in `/bin`:
-graylog_csv = download_graylog_csv(time_period=Hour(2*31*24))
+graylog_csv = download_graylog_csv(Hour(2*31*24))
 csv_data = CSV.read(graylog_csv)
 
 # Drop anything that wasn't a `GET` or doesn't have an http_uri that starts with `/bin`:

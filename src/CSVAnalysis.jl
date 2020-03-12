@@ -1,7 +1,7 @@
 using CSV, DataFrames
 
 export parse_csv_source_ips, parse_csv_payload_sizes, parse_csv_http_uri, parse_csv_http_method, parse_csv_http_response_code,
-       attribute_ips_to_providers, attribute_traffic_to_providers, find_provider
+       attribute_data_to_providers, find_provider
 
 function checkprop(df, name)
     if !hasproperty(df, name)
@@ -91,23 +91,7 @@ function find_provider(prefix_dict::Dict{UInt8,Vector{Tuple{IPSubnet,String}}}, 
     return "<unknown>"
 end
 
-function attribute_ips_to_providers(ips::Vector{<:IPAddr}, pxs::Dict{String,Vector{<:IPSubnet}})
-    # Prebin our prefixes for fast lookups
-    prefix_dict = prebin_pxs(pxs)
-
-    provider_ips = Dict(provider => Vector{IPAddr}() for provider in keys(pxs))
-    provider_ips["<unknown>"] = Vector{IPAddr}()
-
-    # Next, loop through the (uniquified) ips, attributing each one to a provider.
-    for ip in unique(ips)
-        provider = find_provider(prefix_dict, ip)
-        push!(provider_ips[provider], ip)
-    end
-
-    return provider_ips
-end
-
-function attribute_traffic_to_providers(ip_traffic::Dict, pxs::Dict{String,Vector{<:IPSubnet}})
+function attribute_data_to_providers(ip_traffic::Dict, pxs::Dict{String,Vector{<:IPSubnet}})
     # Prebin our prefixes for fast lookups
     prefix_dict = prebin_pxs(pxs)
 

@@ -18,6 +18,7 @@ include("providers/Travis.jl")
 include("providers/Appveyor.jl")
 include("providers/Cirrus.jl")
 include("providers/Drone.jl")
+include("providers/GitHubActions.jl")
 
 include("CSVAnalysis.jl")
 include("graylog.jl")
@@ -49,6 +50,7 @@ function ci_prefixes_by_provider()
         "Travis" => Travis.prefixes(),
         "Cirrus" => Cirrus.prefixes(),
         "Appveyor" => Appveyor.prefixes(),
+        "GitHubActions" => GitHubActions.prefixes(),
         # Eventually
         #"Drone" => Drone.prefixes(),
     )
