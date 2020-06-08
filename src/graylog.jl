@@ -3,13 +3,13 @@ using HTTP, Dates, JSON
 export download_graylog_csv
 
 # If csv_path is not given; default to using the file cache
-function download_graylog_csv(time_period::TimePeriod = Hour(48), kwargs...)
+function download_graylog_csv(time_period::TimePeriod = Hour(48); kwargs...)
     filename = "graylog_$(Second(time_period).value).csv"
     return hit_file_cache(filename) do csv_path
         download_graylog_csv(csv_path; time_period=time_period, kwargs...)
     end
 end
-function download_graylog_csv(time_period::Tuple{DateTime,DateTime}, kwargs...)
+function download_graylog_csv(time_period::Tuple{DateTime,DateTime}; kwargs...)
     filename = "graylog_from$(string(time_period[1]))_to$(string(time_period[2])).csv"
     return hit_file_cache(filename, Hour(24*365)) do csv_path
         download_graylog_csv(csv_path; time_period=time_period, kwargs...)
@@ -50,7 +50,7 @@ end
 function download_graylog_csv(csv_path::AbstractString;
                               auth = get_graylog_token(),
                               time_period::Union{TimePeriod,Tuple{DateTime,DateTime}}=Hour(48),
-                              fields::Tuple = ("http_payload_size", "http_src", "http_uri", "http_method", "http_response_code"),
+                              fields::Tuple = ("http_payload_size", "http_src", "http_uri", "http_method", "http_response_code", "message"),
                               server = "graylog.e.ip.saba.us")
     params = (
         "query" => "*",
