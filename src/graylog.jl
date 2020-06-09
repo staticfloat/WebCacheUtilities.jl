@@ -1,19 +1,25 @@
 using HTTP, Dates, JSON
 
-export download_graylog_csv
+export get_graylog_csv, parse_message
 
-# If csv_path is not given; default to using the file cache
-function download_graylog_csv(time_period::TimePeriod = Hour(48); kwargs...)
-    filename = "graylog_$(Second(time_period).value).csv"
-    return hit_file_cache(filename) do csv_path
-        download_graylog_csv(csv_path; time_period=time_period, kwargs...)
+function download_process(filename, time_period, lifetime; kwargs...)
+    raw_filename = string(filename, ".raw")
+    raw_path = hit_file_cache(raw_filename, lifetime) do raw_path
+        download_graylog_csv(raw_path; time_period=time_period, kwargs...)
+    end
+    return hit_file_cache(filename, lifetime) do csv_path
+        parse_graylog_csv(raw_path, csv_path)
     end
 end
-function download_graylog_csv(time_period::Tuple{DateTime,DateTime}; kwargs...)
+
+# If csv_path is not given; default to using the file cache
+function get_graylog_csv(time_period::TimePeriod = Hour(48); kwargs...)
+    filename = "graylog_$(Second(time_period).value).csv"
+    download_process(filename, time_period, Hour(24); kwargs...)
+end
+function get_graylog_csv(time_period::Tuple{DateTime,DateTime}; kwargs...)
     filename = "graylog_from$(string(time_period[1]))_to$(string(time_period[2])).csv"
-    return hit_file_cache(filename, Hour(24*365)) do csv_path
-        download_graylog_csv(csv_path; time_period=time_period, kwargs...)
-    end
+    download_process(filename, time_period, Hour(24*365); kwargs...)
 end
 
 graylog_session_token = Ref("")
@@ -50,11 +56,10 @@ end
 function download_graylog_csv(csv_path::AbstractString;
                               auth = get_graylog_token(),
                               time_period::Union{TimePeriod,Tuple{DateTime,DateTime}}=Hour(48),
-                              fields::Tuple = ("http_payload_size", "http_src", "http_uri", "http_method", "http_response_code", "message"),
                               server = "graylog.e.ip.saba.us")
     params = (
         "query" => "*",
-        "fields" => join(fields, ","),
+        "fields" => "message",
     )
 
     # If we're given a TimePeriod, then we're doing a relative query.
@@ -83,5 +88,44 @@ function download_graylog_csv(csv_path::AbstractString;
         rm(csv_path, force=true)
         rethrow(e)
     end
+
+    # Once we've downloaded the .csv, we're going to parse it into a new CSV:
     return csv_path
+end
+
+function parse_graylog_csv(in_csv::String, out_csv::String)
+    new_df = DataFrame(parse_message.(eachrow(CSV.read(in_csv))))
+    CSV.write(out_csv, new_df)
+end
+
+function parse_message(row)
+    # Attempt to parse out the stuff we're interested in:
+    m = match(r"""^
+            (?<cache_name>[^ ]+)\s+
+            (?<log_server>[^ ]+):\s+
+            (?<http_src>[a-f:\d\.]+)\s+
+            (?<hostname>[^ ]+)\s+
+            ".*"\s+".*"\s+
+            \[(?<timestamp>.*)\]\s+
+            "(?<http_method>[^ ]+)\s+(?<http_uri>.*)\s+[^ ]+"\s+
+            (?<http_response_code>\d+)\s+
+            (?<http_payload_size>\d+|(:?"-"))\s*
+            ("?(?<http_user_agent>.*)"?)?\s*
+        $"""x, row[:message])
+
+    field_names = (:cache_name, :log_server, :http_src, :hostname, :http_method, :http_uri, :http_response_code, :http_payload_size, :http_user_agent)
+    new_row = Dict{Symbol,Any}(f => missing for f in field_names)
+    new_row[:timestamp] = get(row, :timestamp, nothing)
+    if m !== nothing
+        for field_name in field_names
+            if m[field_name] !== nothing && m[field_name] != "\"-\""
+                val = strip(m[field_name])
+                if field_name in (:http_response_code, :http_payload_size)
+                    val = parse(Int, val)
+                end
+                new_row[field_name] = val
+            end
+        end
+    end
+    return new_row
 end

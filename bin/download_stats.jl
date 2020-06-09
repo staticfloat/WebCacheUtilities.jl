@@ -1,4 +1,5 @@
 push!(LOAD_PATH, abspath(joinpath(@__DIR__, "..")))
+using Revise
 using WebCacheUtilities, Sockets, Dates, CSV, DataFrames, Printf
 using Plots, Measures, StatsPlots
 
@@ -8,8 +9,12 @@ function distill_dataset(criteria::Function, num_months = 18, stop_month = DateT
         to = stop_month - Month(month_idx)
         from = to - Month(1)
         @info("Processing $(month(from))/$(year(from))")
-        csv_path = download_graylog_csv((from, to))
-        dataset = [dataset; filter(criteria, CSV.read(csv_path))]
+        data = CSV.read(get_graylog_csv((from, to)))
+        data = filter(criteria, data)
+        if hasproperty(data, :message)
+            data = select!(data, Not(:message))
+        end
+        dataset = [dataset; data]
     end
 
     return dataset
@@ -34,11 +39,13 @@ noncloud_dataset = distill_dataset() do row
     # Next, check that it was HTTP 200 OK, was a GET to something in `/bin`
     # and it wasn't one of the CI IPs we have collected in a list of prefixes
     # or one of the cloud provider IPs.
+    ip = parse(IPAddr, row[:http_src])
     return row[:http_response_code] == 200 &&
            row[:http_method] == "GET" &&
            startswith(row[:http_uri], "/bin") &&
-           find_provider(ci_pxs, parse.(IPAddr, row[:http_src])) == "<unknown>" &&
-           find_provider(pxs, parse.(IPAddr, row[:http_src])) == "<unknown>"
+           !(row[:http_src] in ("208.81.5.198",)) && # <--- strange outliers
+           find_provider(ci_pxs, ip) == "<unknown>" &&
+           find_provider(pxs, ip) == "<unknown>"
 end
 
 # Also create one where we've filtered out only transmissions >= 50 MB in size
@@ -60,7 +67,7 @@ cloud_dataset = distill_dataset() do row
         return false
     end
 
-    ip = parse.(IPAddr, row[:http_src])
+    ip = parse(IPAddr, row[:http_src])
 
     # Make sure that the GET and "/bin" stuff from above is preserved:
     return row[:http_method] == "GET" &&
@@ -71,7 +78,8 @@ cloud_dataset = distill_dataset() do row
            find_provider(ci_pxs, ip) == "<unknown>" &&
            # Only keep IPs that match our known cloud providers (but not Azure)
            find_provider(pxs, ip) != "<unknown>" &&
-           !startswith(find_provider(pxs, ip), "Azure")
+           startswith(find_provider(pxs, ip), "AWS")
+           #!startswith(find_provider(pxs, ip), "Azure")
 end
 
 # Useful keyfuncs
@@ -85,8 +93,7 @@ function reduce_by_time(extractor::Function, dataset,
                         initializer = () -> Dict())
     stats = Dict()
     for idx in 1:size(dataset, 1)
-        # Gotta chop off the ".000Z" at the end, unfortunately
-        key = key_func(DateTime(dataset[idx, :timestamp][1:end-5]))
+        key = key_func(DateTime(rstrip(dataset[idx, :timestamp], 'Z')))
 
         if !(key in keys(stats))
             stats[key] = initializer()
@@ -103,17 +110,38 @@ function hits_by_time(dataset, key_func)
     end
 end
 
-cloud_hits_by_day = hits_by_time(cloud_dataset, byday)
-noncloud_hits_by_day = hits_by_time(noncloud_dataset, byday)
-noncloud_overhalf_hits_by_day = hits_by_time(noncloud_overhalf_dataset, byday)
+# Caculate some time-based splits
+begin
+    cloud_hits_by_day = hits_by_time(cloud_dataset, byday)
+    noncloud_hits_by_day = hits_by_time(noncloud_dataset, byday)
+    noncloud_overhalf_hits_by_day = hits_by_time(noncloud_overhalf_dataset, byday)
 
-cloud_hits_by_month = hits_by_time(cloud_dataset, bymonth)
-noncloud_hits_by_month = hits_by_time(noncloud_dataset, bymonth)
-noncloud_overhalf_hits_by_month = hits_by_time(noncloud_overhalf_dataset, bymonth)
+    cloud_hits_by_month = hits_by_time(cloud_dataset, bymonth)
+    noncloud_hits_by_month = hits_by_time(noncloud_dataset, bymonth)
+    noncloud_overhalf_hits_by_month = hits_by_time(noncloud_overhalf_dataset, bymonth)
 
-# Plot 'em!
-months = sort(collect(keys(cloud_hits_by_month)))
-days = sort(collect(keys(cloud_hits_by_day)))
+    # Fill in zeros
+    months = sort(unique(vcat(
+        collect(keys(cloud_hits_by_month)),
+        collect(keys(noncloud_hits_by_month)),
+        collect(keys(noncloud_overhalf_hits_by_month)),
+    )))
+    days = sort(unique(vcat(
+        collect(keys(cloud_hits_by_day)),
+        collect(keys(noncloud_hits_by_day)),
+        collect(keys(noncloud_overhalf_hits_by_day)),
+    )))
+    for d_idx in days, dd in (cloud_hits_by_day, noncloud_hits_by_day, noncloud_overhalf_hits_by_day)
+        if !(d_idx in keys(dd))
+            dd[d_idx] = Dict(:hits=>0)
+        end
+    end
+    for m_idx in months, mm in (cloud_hits_by_month, noncloud_hits_by_month, noncloud_overhalf_hits_by_month)
+        if !(m_idx in keys(mm))
+            mm[m_idx] = Dict(:hits=>0)
+        end
+    end
+end
 
 begin
     println("Initiated downloads per month:")
@@ -142,7 +170,7 @@ begin
         bar_position=:stack,
         bar_width=0.7,
         label=["Cloud hits" "Non-cloud hits" "Non-cloud >50MB"],
-        ylabel="Hits/day",
+        ylabel="Hits/month",
         xticks=(1:length(months), ["$(monthname(m)) $(year(m))" for m in months]),
         xrotation=30,
         bottom_margin=11mm,

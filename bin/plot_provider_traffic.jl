@@ -2,13 +2,13 @@ push!(LOAD_PATH, abspath(joinpath(@__DIR__, "..")))
 
 using Plots, Dates, WebCacheUtilities, CSV, Measures, DataFrames, Sockets
 
-# Grab the last month of graylog data (caching it for up to an hour)
-graylog_csv = download_graylog_csv(Hour(31*24))
 ci_pxs = ci_prefixes_by_provider()
 
-# Extract IPs and count up the amount of traffic per IP
+# Grab the last month of graylog data (caching it for up to an hour)
 @info("Parsing CSV...")
-csv_data = CSV.read(graylog_csv)
+csv_data = CSV.read(get_graylog_csv(Hour(31*24)))
+
+# Extract IPs and count up the amount of traffic per IP
 csv_data = dropmissing(csv_data, [:http_response_code, :http_method, :http_uri, :http_src])
 csv_data = filter(row -> row[:http_response_code] == 302 &&
                          row[:http_method] == "GET" &&
