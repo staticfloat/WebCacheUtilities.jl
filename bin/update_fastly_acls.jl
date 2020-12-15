@@ -9,7 +9,8 @@ pxs = prefixes_by_provider()
 @info("Updating $(length(pxs)) ACLs...")
 
 for (service_name, service_id) in ("julialang-s3" => "5hWv4ilX4OJgzwCiZYpqtI",
-                                   "julialangnightlies-s3" => "1zKTkKmU8dXHBMzCG9uSyK")
+                                   "julialangnightlies-s3" => "1zKTkKmU8dXHBMzCG9uSyK",
+                                   "pkg" => "2sXVRXIRMUgge2aOICJUTs")
     service_version = get_mutable_service_version(service_id)
     for provider_name in keys(pxs)
         acl_name = replace(lowercase(provider_name), "-" => "_")

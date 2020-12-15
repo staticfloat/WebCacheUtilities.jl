@@ -160,19 +160,23 @@ function update_acl(service_id::String, acl_id::String, prefixes::Vector{<:IPSub
         ))
     end
 
-    @info(" -> Adding $(added) and removing $(deleted) prefixes")
+    if added != 0 || deleted != 0
+        @info(" -> Adding $(added) and removing $(deleted) prefixes")
 
-    r = fastly(
-        "PATCH",
-        service_id,
-        "acl/$(acl_id)/entries";
-        data=JSON.json(Dict("entries" => new_entries)),
-        headers=Dict("Content-type" => "application/json"),
-    )
-    if r.status != 200
-        error("Unable to set ACL $(acl_id) on service $(service_id)")
+        r = fastly(
+            "PATCH",
+            service_id,
+            "acl/$(acl_id)/entries";
+            data=JSON.json(Dict("entries" => new_entries)),
+            headers=Dict("Content-type" => "application/json"),
+        )
+        if r.status != 200
+            error("Unable to set ACL $(acl_id) on service $(service_id)")
+        end
+        return r
+    else
+        return nothing
     end
-    return r
 end
 
 function get_snippet_id(service_id, service_version, snippet_name)
