@@ -23,7 +23,7 @@ function get_graylog_csv(time_period::Tuple{DateTime,DateTime}; kwargs...)
 end
 
 graylog_session_token = Ref("")
-function get_graylog_token(username=nothing, password=nothing; server="graylog.e.ip.saba.us")
+function get_graylog_token(username=nothing, password=nothing; server="graylog.ip.cflo.at")
     global graylog_session_token
     if isempty(graylog_session_token[])
         username = something(username, get(ENV, "GRAYLOG_USERNAME", nothing))
@@ -56,7 +56,7 @@ end
 function download_graylog_csv(csv_path::AbstractString;
                               auth = get_graylog_token(),
                               time_period::Union{TimePeriod,Tuple{DateTime,DateTime}}=Hour(48),
-                              server = "graylog.e.ip.saba.us")
+                              server = "graylog.ip.cflo.at")
     params = (
         "query" => "*",
         "fields" => "message",

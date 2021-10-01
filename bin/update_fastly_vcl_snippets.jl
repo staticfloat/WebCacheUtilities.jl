@@ -7,7 +7,7 @@ using WebCacheUtilities.Fastly
 # We hardcode our VCL snippet mappings here, since we don't
 # actually have caching servers deployed in all of them
 cached_providers = [
-    ("packet", "ewr1-cache.e.ip.saba.us"),
+    ("packet", "ewr1-cache.ip.cflo.at"),
     ("gce", "storage.googleapis.com"),
 ]
 
