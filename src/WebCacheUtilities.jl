@@ -1,7 +1,9 @@
 module WebCacheUtilities
 using JSON, HTTP, Sockets
 
-include("file_cache.jl")
+using FileCaches: hit_file_cache
+export hit_file_cache
+
 include("IPSubnet.jl")
 include("ipinfo.jl")
 

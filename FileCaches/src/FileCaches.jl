@@ -1,5 +1,11 @@
-using Dates
-export hit_file_cache, cache_json
+module FileCaches
+
+import Dates
+import HTTP
+
+using Dates: Second, TimePeriod
+
+export hit_file_cache
 
 function download_to_cache(filename::String, url::String; kwargs...)
     file_path = hit_file_cache(filename; kwargs...) do file_path
@@ -11,7 +17,12 @@ function download_to_cache(filename::String, url::String; kwargs...)
     return file_path
 end
 
-function hit_file_cache(creator::Function, filename::String, lifetime::TimePeriod = Hour(24), cleanup::Bool = true)
+function hit_file_cache(
+        creator::Function,
+        filename::String;
+        lifetime::TimePeriod = Hour(24),
+        cleanup::Bool = true,
+    )
     cache_dir = joinpath(@__DIR__, "..", "data")
     if !isdir(cache_dir)
         mkpath(cache_dir)
@@ -28,3 +39,5 @@ function hit_file_cache(creator::Function, filename::String, lifetime::TimePerio
     end
     return abspath(file_cache_path)
 end
+
+end # module
